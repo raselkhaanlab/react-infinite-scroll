@@ -1,33 +1,70 @@
-import React, { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-export const delay = (ms:number) => {
-  return new Promise((resovle)=>{
-   setTimeout(resovle, ms)
-  });
-}
-export function useFetchData() {
- const [data, setData] = useState<number[]>([]);
- const [isLoading, setIsloading] = useState(true);
- const [hasMore, setHasMore] = useState(false);
- 
- const loadMore = ()=> {
-  setIsloading(true);
-  setHasMore(true);
-  delay(3000)
-  .then(()=> {
-    if(data.length > 75) {
-      setHasMore(false);
-    } else {
-      setData((prev)=> [...prev, ...Array(25).fill(0)])
+interface IVolume {
+  id:string;
+  etag:string;
+  volumeInfo: {
+    title:string;
+    authors: string [];
+    publisher: string;
+    publishedDate: string;
+    description: string;
+    pageCount: number;
+    categories: string [];
+    language: string;
+    previewLink: string;
+    imageLinks: {
+      smallThumbnail: string;
+      thumbnail: string;
     }
-  })
-  .finally(()=>setIsloading(false));
- }
+  }
+}
+interface IVolumeResponse {
+  totalItems: number;
+  items: IVolume []
+}
+
+export function useFetchData(query: string) {
+ const [data, setData] = useState <IVolume[]>([]);
+ const [isLoading, setIsloading] = useState(false);
+ const [hasMore, setHasMore] = useState(false);
+ const [page, setPage] = useState(0);
+ const abortController = useRef(new AbortController());
+
+ const loadMore = async ()=> {
+  setIsloading(true);
+  setHasMore(false);
+  const maxResults= 10;
+  const startIndex = (page)*maxResults;
+  setPage(page + 1);
+  try {
+    const googleapi = `https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=10&startIndex=${startIndex}`;
+    const response = await fetch(googleapi, {signal: abortController.current.signal});
+    const responseData =await response.json() as unknown as IVolumeResponse;
+    const totalPage = Math.ceil(responseData.totalItems/maxResults) || 1;
+    if( page + 1 < totalPage ) {
+      setHasMore(true);
+    }
+    setData(responseData && responseData.items || []);
+  } catch (e){
+    console.log(e);
+  } finally {
+    setIsloading(false);
+  }
+};
 
  useEffect(()=>{
-  setIsloading(true);
-  setHasMore(true);
-  delay(1000).then(()=> setData(Array(25).fill(0))).finally(()=>setIsloading(false));
- },[]);
- return {isLoading, hasMore, loadMore, data};
+  if(query && page < 1 && data.length < 1) {
+    loadMore();
+  }
+ },[page, data]);
+
+
+
+ useEffect(()=>{
+    setData([]);
+    setPage(0);
+ },[query]);
+
+ return {isLoading, hasMore, loadMore, data, abortController};
 }

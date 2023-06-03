@@ -1,72 +1,54 @@
-import { useState } from 'react';
-import reactLogo from './assets/react.svg';
-import viteLogo from '/vite.svg';
+import { useEffect, useRef, useState } from 'react';
 import './App.css';
 
 import { useFetchData } from './hooks/useFetchData';
-import { InfiniteScroll } from './InfiniteScroll';
+import { InfiniteScroll } from './components/InfiniteScroll';
+import { useDebounce } from './hooks/useDebounce';
 
-function Loader() {
-  return <svg width="135" height="135" viewBox="0 0 135 135" xmlns="http://www.w3.org/2000/svg" fill="#fff">
-  <path d="M67.447 58c5.523 0 10-4.477 10-10s-4.477-10-10-10-10 4.477-10 10 4.477 10 10 10zm9.448 9.447c0 5.523 4.477 10 10 10 5.522 0 10-4.477 10-10s-4.478-10-10-10c-5.523 0-10 4.477-10 10zm-9.448 9.448c-5.523 0-10 4.477-10 10 0 5.522 4.477 10 10 10s10-4.478 10-10c0-5.523-4.477-10-10-10zM58 67.447c0-5.523-4.477-10-10-10s-10 4.477-10 10 4.477 10 10 10 10-4.477 10-10z">
-      <animateTransform
-          attributeName="transform"
-          type="rotate"
-          from="0 67 67"
-          to="-360 67 67"
-          dur="2.5s"
-          repeatCount="indefinite"/>
-  </path>
-  <path d="M28.19 40.31c6.627 0 12-5.374 12-12 0-6.628-5.373-12-12-12-6.628 0-12 5.372-12 12 0 6.626 5.372 12 12 12zm30.72-19.825c4.686 4.687 12.284 4.687 16.97 0 4.686-4.686 4.686-12.284 0-16.97-4.686-4.687-12.284-4.687-16.97 0-4.687 4.686-4.687 12.284 0 16.97zm35.74 7.705c0 6.627 5.37 12 12 12 6.626 0 12-5.373 12-12 0-6.628-5.374-12-12-12-6.63 0-12 5.372-12 12zm19.822 30.72c-4.686 4.686-4.686 12.284 0 16.97 4.687 4.686 12.285 4.686 16.97 0 4.687-4.686 4.687-12.284 0-16.97-4.685-4.687-12.283-4.687-16.97 0zm-7.704 35.74c-6.627 0-12 5.37-12 12 0 6.626 5.373 12 12 12s12-5.374 12-12c0-6.63-5.373-12-12-12zm-30.72 19.822c-4.686-4.686-12.284-4.686-16.97 0-4.686 4.687-4.686 12.285 0 16.97 4.686 4.687 12.284 4.687 16.97 0 4.687-4.685 4.687-12.283 0-16.97zm-35.74-7.704c0-6.627-5.372-12-12-12-6.626 0-12 5.373-12 12s5.374 12 12 12c6.628 0 12-5.373 12-12zm-19.823-30.72c4.687-4.686 4.687-12.284 0-16.97-4.686-4.686-12.284-4.686-16.97 0-4.687 4.686-4.687 12.284 0 16.97 4.686 4.687 12.284 4.687 16.97 0z">
-      <animateTransform
-          attributeName="transform"
-          type="rotate"
-          from="0 67 67"
-          to="360 67 67"
-          dur="8s"
-          repeatCount="indefinite"/>
-  </path>
-</svg>
-}
 function App() {
-  const [count, setCount] = useState(0);
-  const {isLoading, loadMore, hasMore, data} = useFetchData();
-  console.log(data);
+  const [query, setQuery] = useState("");
+  const debounceQuery = useDebounce(query, 500);
+  const {isLoading, hasMore, loadMore, data} = useFetchData(debounceQuery || "");
+  const [volumes, setVolumes] = useState(data);
+  
+  useEffect(()=>{
+    if(!debounceQuery) {
+      setVolumes([]);
+    }
+  },[debounceQuery]);
+
+  const handleChange = (e:React.ChangeEvent<HTMLInputElement>)=>{
+      setVolumes([]);
+      setQuery(e.currentTarget.value);
+  }
+
+  useEffect(()=>{
+    setVolumes((prev)=> Array.from(prev.concat(data)))
+  },[data]);
 
   return (
     <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => {
-          setCount((count) => count + 1);
-        }}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
+      <p>React infinite scroll</p>
+      <input value={query} onChange={handleChange}/>
+      {query && <p> Search query: {query}</p>}
 
+       {isLoading && query &&  <p>Searching for : {query} ......</p>}
       <InfiniteScroll
-        loadMoreFunc={loadMore}
+        loadMoreFunc={loadMore.bind(null, query)}
+        hasMore={hasMore && volumes.length> 0}
         isLoading={isLoading}
-        hasMore = {hasMore}
-        loader= {<Loader/>}
         >
-        {data.map((item, index)=>{
-          return <div style={{border:"1px solid white", marginBottom:"8px", height:"400px"}} key={index+1 +"-" + item}>{index+1}</div>
-        })}
+          <div style={{display:"flex", flexWrap: "wrap", justifyContent:"center",gap:"10px"}}>
+          {
+              volumes.map((item,index)=>{
+                return <div 
+                key={item.id + index} 
+                style={{height: 200, width: 300, outline:"1px solid white", outlineOffset:"4px"}}>
+                  <img src={item?.volumeInfo?.imageLinks?.thumbnail} alt={item?.volumeInfo?.imageLinks?.thumbnail} style={{display: "block", height:"100%", width: "100%"}} />
+                </div>
+              })
+          }
+          </div>
       </InfiniteScroll>
     </>
   )
